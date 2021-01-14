@@ -597,18 +597,6 @@ func TestBitmapCOW(t *testing.T) {
 		assert.Equal(t, rb.GetCardinality(), rc.GetCardinality())
 	})
 
-	t.Run("ArrayContainerCardinalityTest", func(t *testing.T) {
-		ac := newArrayContainer()
-		for k := uint16(0); k < 100; k++ {
-			ac.iadd(k)
-			assert.EqualValues(t, k+1, ac.getCardinality())
-		}
-		for k := uint16(0); k < 100; k++ {
-			ac.iadd(k)
-			assert.EqualValues(t, 100, ac.getCardinality())
-		}
-	})
-
 	t.Run("or test", func(t *testing.T) {
 		rr := NewBitmap()
 		rr.SetCopyOnWrite(true)
@@ -778,43 +766,6 @@ func TestBitmapCOW(t *testing.T) {
 
 		assert.Equal(t, len(arrayrr3), len(arrayrr))
 		assert.True(t, ok)
-	})
-
-	t.Run("constainer factory ", func(t *testing.T) {
-		bc1 := newBitmapContainer()
-		bc2 := newBitmapContainer()
-		bc3 := newBitmapContainer()
-		ac1 := newArrayContainer()
-		ac2 := newArrayContainer()
-		ac3 := newArrayContainer()
-
-		for i := 0; i < 5000; i++ {
-			bc1.iadd(uint16(i * 70))
-		}
-		for i := 0; i < 5000; i++ {
-			bc2.iadd(uint16(i * 70))
-		}
-		for i := 0; i < 5000; i++ {
-			bc3.iadd(uint16(i * 70))
-		}
-		for i := 0; i < 4000; i++ {
-			ac1.iadd(uint16(i * 50))
-		}
-		for i := 0; i < 4000; i++ {
-			ac2.iadd(uint16(i * 50))
-		}
-		for i := 0; i < 4000; i++ {
-			ac3.iadd(uint16(i * 50))
-		}
-
-		rbc := ac1.clone().(*arrayContainer).toBitmapContainer()
-		assert.True(t, validate(rbc, ac1))
-
-		rbc = ac2.clone().(*arrayContainer).toBitmapContainer()
-		assert.True(t, validate(rbc, ac2))
-
-		rbc = ac3.clone().(*arrayContainer).toBitmapContainer()
-		assert.True(t, validate(rbc, ac3))
 	})
 
 	t.Run("flipTest1 ", func(t *testing.T) {
@@ -1567,12 +1518,6 @@ func TestRoaringArrayCOW(t *testing.T) {
 		assert.Equal(t, 0, a.size())
 	})
 
-	t.Run("Test Insert", func(t *testing.T) {
-		a.appendContainer(0, newArrayContainer(), false)
-
-		assert.Equal(t, 1, a.size())
-	})
-
 	t.Run("Test Remove", func(t *testing.T) {
 		a.remove(0)
 		assert.Equal(t, 0, a.size())
@@ -1591,30 +1536,6 @@ func TestRoaringArrayCOW(t *testing.T) {
 	t.Run("Test popcount 16", func(t *testing.T) {
 		res := popcount(0xff00ff)
 		assert.EqualValues(t, 16, res)
-	})
-
-	t.Run("Test ArrayContainer Add", func(t *testing.T) {
-		ar := newArrayContainer()
-		ar.iadd(1)
-
-		assert.EqualValues(t, 1, ar.getCardinality())
-	})
-
-	t.Run("Test ArrayContainer Add wacky", func(t *testing.T) {
-		ar := newArrayContainer()
-		ar.iadd(0)
-		ar.iadd(5000)
-
-		assert.EqualValues(t, 2, ar.getCardinality())
-	})
-
-	t.Run("Test ArrayContainer Add Reverse", func(t *testing.T) {
-		ar := newArrayContainer()
-		ar.iadd(5000)
-		ar.iadd(2048)
-		ar.iadd(0)
-
-		assert.EqualValues(t, 3, ar.getCardinality())
 	})
 
 	t.Run("Test BitmapContainer Add ", func(t *testing.T) {

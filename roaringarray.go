@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+
 	"github.com/RoaringBitmap/roaring/internal"
 )
 
@@ -297,8 +298,6 @@ func (ra *roaringArray) getContainerAtIndex(i int) container {
 func (ra *roaringArray) getFastContainerAtIndex(i int, needsWriteable bool) container {
 	c := ra.getContainerAtIndex(i)
 	switch t := c.(type) {
-	case *arrayContainer:
-		c = t.toBitmapContainer()
 	case *runContainer16:
 		if !t.isFull() {
 			c = t.toBitmapContainer()
@@ -653,19 +652,6 @@ func (ra *roaringArray) readFrom(stream internal.ByteInput) (int64, error) {
 			nb := bitmapContainer{
 				cardinality: card,
 				bitmap:      byteSliceAsUint64Slice(buf),
-			}
-
-			ra.containers[i] = &nb
-		} else {
-			// array container
-			buf, err := stream.Next(card * 2)
-
-			if err != nil {
-				return stream.GetReadBytes(), fmt.Errorf("failed to read array container: %s", err)
-			}
-
-			nb := arrayContainer{
-				byteSliceAsUint16Slice(buf),
 			}
 
 			ra.containers[i] = &nb

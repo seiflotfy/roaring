@@ -118,9 +118,7 @@ func repairAfterLazy(c container) container {
 			t.computeCardinality()
 		}
 
-		if t.getCardinality() <= arrayDefaultMaxSize {
-			return t.toArrayContainer()
-		} else if c.(*bitmapContainer).isFull() {
+		if c.(*bitmapContainer).isFull() {
 			return newRunContainer16Range(0, MaxUint16)
 		}
 	}
@@ -130,8 +128,6 @@ func repairAfterLazy(c container) container {
 
 func toBitmapContainer(c container) container {
 	switch t := c.(type) {
-	case *arrayContainer:
-		return t.toBitmapContainer()
 	case *runContainer16:
 		if !t.isFull() {
 			return t.toBitmapContainer()

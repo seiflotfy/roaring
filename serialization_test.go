@@ -231,8 +231,6 @@ func TestSerializationBasic3_042(t *testing.T) {
 		switch cn := v.(type) {
 		case *bitmapContainer:
 			bc = true
-		case *arrayContainer:
-			ac = true
 		case *runContainer16:
 			rc = true
 		default:
@@ -289,14 +287,6 @@ func TestByteSliceAsUint16Slice(t *testing.T) {
 		assert.False(t, uint16Slice[0] != 42 || uint16Slice[1] != 43)
 	})
 
-	t.Run("inlined", func(t *testing.T) {
-		first, second := singleSliceInArray()
-		t.Logf("received %v %v", first, second[0])
-		if !first.Equals(second[0]) {
-			t.Errorf("inline fail %v %v", first, second[0])
-		}
-	})
-
 	t.Run("empty slice", func(t *testing.T) {
 		slice := make([]byte, 0, 0)
 		uint16Slice := byteSliceAsUint16Slice(slice)
@@ -312,19 +302,6 @@ func TestByteSliceAsUint16Slice(t *testing.T) {
 			byteSliceAsUint16Slice(slice)
 		})
 	})
-}
-
-func singleSliceInArray() (*Bitmap, []*Bitmap) {
-	firstSlice := singleSlice()
-	containerSlice := make([]*Bitmap, 0)
-	secondContainer := singleSlice()
-	containerSlice = append(containerSlice, secondContainer)
-	return firstSlice, containerSlice
-}
-
-func singleSlice() *Bitmap {
-	slice := make([]byte, 2)
-	return &Bitmap{highlowcontainer: roaringArray{keys: []uint16{0}, containers: []container{&arrayContainer{byteSliceAsUint16Slice(slice)}}}}
 }
 
 func TestByteSliceAsUint64Slice(t *testing.T) {

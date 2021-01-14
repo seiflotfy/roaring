@@ -34,8 +34,6 @@ main:
 			} else {
 				c1 := x1.highlowcontainer.getContainerAtIndex(pos1)
 				switch t := c1.(type) {
-				case *arrayContainer:
-					c1 = t.toBitmapContainer()
 				case *runContainer16:
 					if !t.isFull() {
 						c1 = t.toBitmapContainer()
@@ -91,8 +89,6 @@ main:
 			} else {
 				c1 := x1.highlowcontainer.getContainerAtIndex(pos1)
 				switch t := c1.(type) {
-				case *arrayContainer:
-					c1 = t.toBitmapContainer()
 				case *runContainer16:
 					if !t.isFull() {
 						c1 = t.toBitmapContainer()
@@ -128,9 +124,7 @@ func (x1 *Bitmap) repairAfterLazy() {
 			if c.(*bitmapContainer).cardinality == invalidCardinality {
 				c = x1.highlowcontainer.getWritableContainerAtIndex(pos)
 				c.(*bitmapContainer).computeCardinality()
-				if c.(*bitmapContainer).getCardinality() <= arrayDefaultMaxSize {
-					x1.highlowcontainer.setContainerAtIndex(pos, c.(*bitmapContainer).toArrayContainer())
-				} else if c.(*bitmapContainer).isFull() {
+				if c.(*bitmapContainer).isFull() {
 					x1.highlowcontainer.setContainerAtIndex(pos, newRunContainer16Range(0, MaxUint16))
 				}
 			}
@@ -245,7 +239,6 @@ func (x1 *Bitmap) AndAny(bitmaps ...*Bitmap) {
 	intersections := 0
 	keyContainers := make([]container, 0, len(filters))
 	var (
-		tmpArray   *arrayContainer
 		tmpBitmap  *bitmapContainer
 		minNextKey uint16
 	)
@@ -305,16 +298,6 @@ func (x1 *Bitmap) AndAny(bitmaps ...*Bitmap) {
 					tmpBitmap.ior(c)
 				}
 				ored = tmpBitmap
-			} else {
-				if tmpArray == nil {
-					tmpArray = newArrayContainerCapacity(maxPossibleOr)
-				}
-				tmpArray.realloc(maxPossibleOr)
-				tmpArray.resetTo(keyContainers[0])
-				for _, c := range keyContainers[1:] {
-					tmpArray.ior(c)
-				}
-				ored = tmpArray
 			}
 		}
 

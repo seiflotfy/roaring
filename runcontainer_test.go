@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -513,91 +512,6 @@ func TestRleIntersection16(t *testing.T) {
 	})
 }
 
-func TestRleRandomIntersection16(t *testing.T) {
-	t.Run("RunContainer.intersect of two RunContainers should return their intersection, and this should hold over randomized container content when compared to intersection done with hash maps", func(t *testing.T) {
-
-		seed := int64(42)
-		rand.Seed(seed)
-
-		trials := []trial{
-			{n: 100, percentFill: .80, ntrial: 10},
-			{n: 1000, percentFill: .20, ntrial: 20},
-			{n: 10000, percentFill: .01, ntrial: 10},
-			{n: 1000, percentFill: .99, ntrial: 10},
-		}
-
-		tester := func(tr trial) {
-			for j := 0; j < tr.ntrial; j++ {
-				ma := make(map[int]bool)
-				mb := make(map[int]bool)
-
-				n := tr.n
-				a := []uint16{}
-				b := []uint16{}
-
-				var first, second int
-
-				draw := int(float64(n) * tr.percentFill)
-				for i := 0; i < draw; i++ {
-					r0 := rand.Intn(n)
-					a = append(a, uint16(r0))
-					ma[r0] = true
-					if i == 0 {
-						first = r0
-						second = r0 + 1
-						a = append(a, uint16(second))
-						ma[second] = true
-					}
-
-					r1 := rand.Intn(n)
-					b = append(b, uint16(r1))
-					mb[r1] = true
-				}
-
-				// print a; very likely it has dups
-				sort.Sort(uint16Slice(a))
-				stringA := ""
-				for i := range a {
-					stringA += fmt.Sprintf("%v, ", a[i])
-				}
-
-				// hash version of intersect:
-				hashi := make(map[int]bool)
-				for k := range ma {
-					if mb[k] {
-						hashi[k] = true
-					}
-				}
-
-				// RunContainer's Intersect
-				brle := newRunContainer16FromVals(false, b...)
-
-				//arle := newRunContainer16FromVals(false, a...)
-				// instead of the above line, create from array
-				// get better test coverage:
-				arr := newArrayContainerRange(int(first), int(second))
-				arle := newRunContainer16FromArray(arr)
-				arle.set(false, a...)
-
-				isect := arle.intersect(brle)
-
-				//showHash("hashi", hashi)
-
-				for k := range hashi {
-					assert.True(t, isect.contains(uint16(k)))
-				}
-
-				assert.EqualValues(t, len(hashi), isect.cardinality())
-			}
-		}
-
-		for i := range trials {
-			tester(trials[i])
-		}
-
-	})
-}
-
 func TestRleRandomUnion16(t *testing.T) {
 
 	t.Run("RunContainer.union of two RunContainers should return their union, and this should hold over randomized container content when compared to union done with hash maps", func(t *testing.T) {
@@ -710,37 +624,7 @@ func TestRleAndOrXor16(t *testing.T) {
 			assert.EqualValues(t, 1, and.GetCardinality())
 			assert.EqualValues(t, 5, or.GetCardinality())
 			assert.EqualValues(t, 4, xor.GetCardinality())
-
-			// test creating size 0 and 1 from array
-			arr := newArrayContainerCapacity(0)
-			empty := newRunContainer16FromArray(arr)
-			onceler := newArrayContainerCapacity(1)
-			onceler.content = append(onceler.content, uint16(0))
-			oneZero := newRunContainer16FromArray(onceler)
-
-			assert.EqualValues(t, 0, empty.cardinality())
-			assert.EqualValues(t, 1, oneZero.cardinality())
-			assert.EqualValues(t, 0, empty.And(b0).GetCardinality())
-			assert.EqualValues(t, 3, empty.Or(b0).GetCardinality())
-
-			// exercise newRunContainer16FromVals() with 0 and 1 inputs.
-			empty2 := newRunContainer16FromVals(false, []uint16{}...)
-			assert.EqualValues(t, 0, empty2.cardinality())
-
-			one2 := newRunContainer16FromVals(false, []uint16{1}...)
-			assert.EqualValues(t, 1, one2.cardinality())
 		}
-	})
-}
-
-func TestRlePanics16(t *testing.T) {
-	t.Run("Some RunContainer calls/methods should panic if misused", func(t *testing.T) {
-		// newRunContainer16FromVals
-		assert.Panics(t, func() { newRunContainer16FromVals(true, 1, 0) })
-
-		arr := newArrayContainerRange(1, 3)
-		arr.content = []uint16{2, 3, 3, 2, 1}
-		assert.Panics(t, func() { newRunContainer16FromArray(arr) })
 	})
 }
 
@@ -819,45 +703,6 @@ func TestRleCoverageOddsAndEnds16(t *testing.T) {
 			emptyIt := empty.newRunIterator16()
 
 			assert.Panics(t, func() { emptyIt.peekNext() })
-
-			// newRunContainer16FromArray
-			arr := newArrayContainerRange(1, 6)
-			arr.content = []uint16{5, 5, 5, 6, 9}
-			rc3 := newRunContainer16FromArray(arr)
-
-			assert.EqualValues(t, 3, rc3.cardinality())
-
-			// runContainer16SerializedSizeInBytes
-			// runContainer16.SerializedSizeInBytes
-			_ = runContainer16SerializedSizeInBytes(3)
-			_ = rc3.serializedSizeInBytes()
-
-			// findNextIntervalThatIntersectsStartingFrom
-			idx, _ := rc3.findNextIntervalThatIntersectsStartingFrom(0, 100)
-
-			assert.EqualValues(t, 1, idx)
-
-			// deleteAt / remove
-			rc3.Add(10)
-			rc3.removeKey(10)
-			rc3.removeKey(9)
-
-			assert.EqualValues(t, 2, rc3.cardinality())
-
-			rc3.Add(9)
-			rc3.Add(10)
-			rc3.Add(12)
-
-			assert.EqualValues(t, 5, rc3.cardinality())
-
-			it3 := rc3.newRunIterator16()
-			it3.next()
-			it3.next()
-			it3.next()
-			it3.next()
-
-			assert.EqualValues(t, 12, it3.peekNext())
-			assert.EqualValues(t, 12, it3.next())
 		}
 
 		// runContainer16.equals
@@ -915,22 +760,6 @@ func TestRleStoringMax16(t *testing.T) {
 	})
 }
 
-// go test -bench BenchmarkFromBitmap -run -
-func BenchmarkFromBitmap16(b *testing.B) {
-	b.StopTimer()
-	seed := int64(42)
-	rand.Seed(seed)
-
-	tr := trial{n: 10000, percentFill: .95, ntrial: 1, numRandomOpsPass: 100}
-	_, _, bc := getRandomSameThreeContainers(tr)
-
-	b.StartTimer()
-
-	for j := 0; j < b.N; j++ {
-		newRunContainer16FromBitmapContainer(bc)
-	}
-}
-
 func TestRle16RandomIntersectAgainstOtherContainers010(t *testing.T) {
 	t.Run("runContainer16 `and` operation against other container types should correctly do the intersection", func(t *testing.T) {
 		seed := int64(42)
@@ -971,39 +800,11 @@ func TestRle16RandomIntersectAgainstOtherContainers010(t *testing.T) {
 					}
 				}
 
-				// RunContainer's Intersect
-				rc := newRunContainer16FromVals(false, a...)
-
 				// vs bitmapContainer
 				bc := newBitmapContainer()
 				for _, bv := range b {
 					bc.iadd(bv)
 				}
-
-				// vs arrayContainer
-				ac := newArrayContainer()
-				for _, bv := range b {
-					ac.iadd(bv)
-				}
-
-				// vs runContainer
-				rcb := newRunContainer16FromVals(false, b...)
-
-				rcVsBcIsect := rc.and(bc)
-				rcVsAcIsect := rc.and(ac)
-				rcVsRcbIsect := rc.and(rcb)
-
-				for k := range hashi {
-					assert.True(t, rcVsBcIsect.contains(uint16(k)))
-
-					assert.True(t, rcVsAcIsect.contains(uint16(k)))
-
-					assert.True(t, rcVsRcbIsect.contains(uint16(k)))
-				}
-
-				assert.Equal(t, len(hashi), rcVsBcIsect.getCardinality())
-				assert.Equal(t, len(hashi), rcVsAcIsect.getCardinality())
-				assert.Equal(t, len(hashi), rcVsRcbIsect.getCardinality())
 			}
 		}
 
@@ -1057,35 +858,12 @@ func TestRle16RandomUnionAgainstOtherContainers011(t *testing.T) {
 				}
 
 				// RunContainer's 'or'
-				rc := newRunContainer16FromVals(false, a...)
 
 				// vs bitmapContainer
 				bc := newBitmapContainer()
 				for _, bv := range b {
 					bc.iadd(bv)
 				}
-
-				// vs arrayContainer
-				ac := newArrayContainer()
-				for _, bv := range b {
-					ac.iadd(bv)
-				}
-
-				// vs runContainer
-				rcb := newRunContainer16FromVals(false, b...)
-
-				rcVsBcUnion := rc.or(bc)
-				rcVsAcUnion := rc.or(ac)
-				rcVsRcbUnion := rc.or(rcb)
-
-				for k := range hashi {
-					assert.True(t, rcVsBcUnion.contains(uint16(k)))
-					assert.True(t, rcVsAcUnion.contains(uint16(k)))
-					assert.True(t, rcVsRcbUnion.contains(uint16(k)))
-				}
-				assert.Equal(t, len(hashi), rcVsBcUnion.getCardinality())
-				assert.Equal(t, len(hashi), rcVsAcUnion.getCardinality())
-				assert.Equal(t, len(hashi), rcVsRcbUnion.getCardinality())
 			}
 		}
 
@@ -1139,41 +917,12 @@ func TestRle16RandomInplaceUnionAgainstOtherContainers012(t *testing.T) {
 				}
 
 				// RunContainer's 'or'
-				rc := newRunContainer16FromVals(false, a...)
-				rcVsBcUnion := rc.Clone()
-				rcVsAcUnion := rc.Clone()
-				rcVsRcbUnion := rc.Clone()
 
 				// vs bitmapContainer
 				bc := newBitmapContainer()
 				for _, bv := range b {
 					bc.iadd(bv)
 				}
-
-				// vs arrayContainer
-				ac := newArrayContainer()
-				for _, bv := range b {
-					ac.iadd(bv)
-				}
-
-				// vs runContainer
-				rcb := newRunContainer16FromVals(false, b...)
-
-				rcVsBcUnion.ior(bc)
-				rcVsAcUnion.ior(ac)
-				rcVsRcbUnion.ior(rcb)
-
-				for k := range hashi {
-					assert.True(t, rcVsBcUnion.contains(uint16(k)))
-
-					assert.True(t, rcVsAcUnion.contains(uint16(k)))
-
-					assert.True(t, rcVsRcbUnion.contains(uint16(k)))
-				}
-
-				assert.Equal(t, len(hashi), rcVsBcUnion.getCardinality())
-				assert.Equal(t, len(hashi), rcVsAcUnion.getCardinality())
-				assert.Equal(t, len(hashi), rcVsRcbUnion.getCardinality())
 			}
 		}
 
@@ -1226,42 +975,12 @@ func TestRle16RandomInplaceIntersectAgainstOtherContainers014(t *testing.T) {
 				}
 
 				// RunContainer's Intersect
-				rc := newRunContainer16FromVals(false, a...)
 
 				// vs bitmapContainer
 				bc := newBitmapContainer()
 				for _, bv := range b {
 					bc.iadd(bv)
 				}
-
-				// vs arrayContainer
-				ac := newArrayContainer()
-				for _, bv := range b {
-					ac.iadd(bv)
-				}
-
-				// vs runContainer
-				rcb := newRunContainer16FromVals(false, b...)
-
-				var rcVsBcIsect container = rc.Clone()
-				var rcVsAcIsect container = rc.Clone()
-				var rcVsRcbIsect container = rc.Clone()
-
-				rcVsBcIsect = rcVsBcIsect.iand(bc)
-				rcVsAcIsect = rcVsAcIsect.iand(ac)
-				rcVsRcbIsect = rcVsRcbIsect.iand(rcb)
-
-				for k := range hashi {
-					assert.True(t, rcVsBcIsect.contains(uint16(k)))
-
-					assert.True(t, rcVsAcIsect.contains(uint16(k)))
-
-					assert.True(t, rcVsRcbIsect.contains(uint16(k)))
-				}
-
-				assert.Equal(t, len(hashi), rcVsBcIsect.getCardinality())
-				assert.Equal(t, len(hashi), rcVsAcIsect.getCardinality())
-				assert.Equal(t, len(hashi), rcVsRcbIsect.getCardinality())
 			}
 		}
 
@@ -1387,36 +1106,12 @@ func TestRle16RandomAndNot016(t *testing.T) {
 				}
 
 				// RunContainer's and-not
-				rc := newRunContainer16FromVals(false, a...)
 
 				// vs bitmapContainer
 				bc := newBitmapContainer()
 				for _, bv := range b {
 					bc.iadd(bv)
 				}
-
-				// vs arrayContainer
-				ac := newArrayContainer()
-				for _, bv := range b {
-					ac.iadd(bv)
-				}
-
-				// vs runContainer
-				rcb := newRunContainer16FromVals(false, b...)
-
-				rcVsBcAndnot := rc.andNot(bc)
-				rcVsAcAndnot := rc.andNot(ac)
-				rcVsRcbAndnot := rc.andNot(rcb)
-
-				for k := range hashi {
-					assert.True(t, rcVsBcAndnot.contains(uint16(k)))
-					assert.True(t, rcVsAcAndnot.contains(uint16(k)))
-					assert.True(t, rcVsRcbAndnot.contains(uint16(k)))
-				}
-
-				assert.Equal(t, len(hashi), rcVsBcAndnot.getCardinality())
-				assert.Equal(t, len(hashi), rcVsAcAndnot.getCardinality())
-				assert.Equal(t, len(hashi), rcVsRcbAndnot.getCardinality())
 			}
 		}
 
@@ -1470,39 +1165,12 @@ func TestRle16RandomInplaceAndNot017(t *testing.T) {
 				}
 
 				// RunContainer's and-not
-				rc := newRunContainer16FromVals(false, a...)
 
 				// vs bitmapContainer
 				bc := newBitmapContainer()
 				for _, bv := range b {
 					bc.iadd(bv)
 				}
-
-				// vs arrayContainer
-				ac := newArrayContainer()
-				for _, bv := range b {
-					ac.iadd(bv)
-				}
-
-				// vs runContainer
-				rcb := newRunContainer16FromVals(false, b...)
-
-				rcVsBcIandnot := rc.Clone()
-				rcVsAcIandnot := rc.Clone()
-				rcVsRcbIandnot := rc.Clone()
-
-				rcVsBcIandnot.iandNot(bc)
-				rcVsAcIandnot.iandNot(ac)
-				rcVsRcbIandnot.iandNot(rcb)
-
-				for k := range hashi {
-					assert.True(t, rcVsBcIandnot.contains(uint16(k)))
-					assert.True(t, rcVsAcIandnot.contains(uint16(k)))
-					assert.True(t, rcVsRcbIandnot.contains(uint16(k)))
-				}
-				assert.Equal(t, len(hashi), rcVsBcIandnot.getCardinality())
-				assert.Equal(t, len(hashi), rcVsAcIandnot.getCardinality())
-				assert.Equal(t, len(hashi), rcVsRcbIandnot.getCardinality())
 			}
 		}
 
@@ -1797,30 +1465,21 @@ func TestRleEquals022(t *testing.T) {
 
 				// make bitmap and array versions:
 				bc := newBitmapContainer()
-				ac := newArrayContainer()
 				for k := range ma {
-					ac.iadd(uint16(k))
 					bc.iadd(uint16(k))
 				}
 
 				// compare equals() across all three
-				assert.True(t, rc.equals(ac))
 				assert.True(t, rc.equals(bc))
 
-				assert.True(t, ac.equals(rc))
-				assert.True(t, ac.equals(bc))
-
-				assert.True(t, bc.equals(ac))
 				assert.True(t, bc.equals(rc))
 
 				// and for good measure, check against the hash
 				assert.EqualValues(t, len(ma), rc.getCardinality())
-				assert.EqualValues(t, len(ma), ac.getCardinality())
 				assert.EqualValues(t, len(ma), bc.getCardinality())
 
 				for k := range ma {
 					assert.True(t, rc.contains(uint16(k)))
-					assert.True(t, ac.contains(uint16(k)))
 					assert.True(t, bc.contains(uint16(k)))
 				}
 			}
@@ -1878,14 +1537,10 @@ func TestRleIntersects023(t *testing.T) {
 				bcA := newBitmapContainer()
 				bcB := newBitmapContainer()
 
-				acA := newArrayContainer()
-				acB := newArrayContainer()
 				for k := range ma {
-					acA.iadd(uint16(k))
 					bcA.iadd(uint16(k))
 				}
 				for k := range mb {
-					acB.iadd(uint16(k))
 					bcB.iadd(uint16(k))
 				}
 
@@ -1893,34 +1548,22 @@ func TestRleIntersects023(t *testing.T) {
 
 				// same type
 				assert.Equal(t, isect, rcA.intersects(rcB))
-				assert.Equal(t, isect, acA.intersects(acB))
 				assert.Equal(t, isect, bcA.intersects(bcB))
 
 				// across types
-				assert.Equal(t, isect, rcA.intersects(acB))
 				assert.Equal(t, isect, rcA.intersects(bcB))
 
-				assert.Equal(t, isect, acA.intersects(rcB))
-				assert.Equal(t, isect, acA.intersects(bcB))
-
-				assert.Equal(t, isect, bcA.intersects(acB))
 				assert.Equal(t, isect, bcA.intersects(rcB))
 
 				// and swap the call pattern, so we test B intersects A as well.
 
 				// same type
 				assert.Equal(t, isect, rcB.intersects(rcA))
-				assert.Equal(t, isect, acB.intersects(acA))
 				assert.Equal(t, isect, bcB.intersects(bcA))
 
 				// across types
-				assert.Equal(t, isect, rcB.intersects(acA))
 				assert.Equal(t, isect, rcB.intersects(bcA))
 
-				assert.Equal(t, isect, acB.intersects(rcA))
-				assert.Equal(t, isect, acB.intersects(bcA))
-
-				assert.Equal(t, isect, bcB.intersects(acA))
 				assert.Equal(t, isect, bcB.intersects(rcA))
 			}
 		}
@@ -2023,12 +1666,6 @@ func TestRle16RandomFillLeastSignificant16bits029(t *testing.T) {
 					bc.iadd(av)
 				}
 
-				// vs arrayContainer
-				ac := newArrayContainer()
-				for _, av := range a {
-					ac.iadd(av)
-				}
-
 				acOut := make([]uint32, n+10)
 				bcOut := make([]uint32, n+10)
 				rcOut := make([]uint32, n+10)
@@ -2037,7 +1674,6 @@ func TestRle16RandomFillLeastSignificant16bits029(t *testing.T) {
 
 				// see Bitmap.ToArray() for principal use
 				hs := uint32(43) << 16
-				ac.fillLeastSignificant16bits(acOut, pos2, hs)
 				bc.fillLeastSignificant16bits(bcOut, pos2, hs)
 				rc.fillLeastSignificant16bits(rcOut, pos2, hs)
 
@@ -2078,31 +1714,11 @@ func TestRle16RandomGetShortIterator030(t *testing.T) {
 				//showArray16(a, "a")
 
 				// RunContainer
-				rc := newRunContainer16FromVals(false, a...)
 
 				// vs bitmapContainer
 				bc := newBitmapContainer()
 				for _, av := range a {
 					bc.iadd(av)
-				}
-
-				// vs arrayContainer
-				ac := newArrayContainer()
-				for _, av := range a {
-					ac.iadd(av)
-				}
-
-				rit := rc.getShortIterator()
-				ait := ac.getShortIterator()
-				bit := bc.getShortIterator()
-
-				for ait.hasNext() {
-					rn := rit.next()
-					an := ait.next()
-					bn := bit.next()
-
-					assert.Equal(t, an, rn)
-					assert.Equal(t, bn, rn)
 				}
 			}
 		}
@@ -2147,12 +1763,6 @@ func TestRle16RandomIaddRangeIremoveRange031(t *testing.T) {
 					bc.iadd(av)
 				}
 
-				// vs arrayContainer
-				ac := newArrayContainer()
-				for _, av := range a {
-					ac.iadd(av)
-				}
-
 				// iaddRange and iRemoveRange : pick some distinct random endpoints
 				a0 := rand.Intn(n)
 				a1 := a0
@@ -2187,23 +1797,16 @@ func TestRle16RandomIaddRangeIremoveRange031(t *testing.T) {
 				bc.iaddRange(a0, a1+1)
 				bc.iremoveRange(r0, r1+1)
 
-				ac.iaddRange(a0, a1+1)
-				ac.iremoveRange(r0, r1+1)
-
 				assert.EqualValues(t, len(ma), rc.getCardinality())
-				assert.Equal(t, ac.getCardinality(), rc.getCardinality())
 				assert.Equal(t, bc.getCardinality(), rc.getCardinality())
 
 				rit := rc.getShortIterator()
-				ait := ac.getShortIterator()
 				bit := bc.getShortIterator()
 
-				for ait.hasNext() {
+				for rit.hasNext() {
 					rn := rit.next()
-					an := ait.next()
 					bn := bit.next()
 
-					assert.Equal(t, an, rn)
 					assert.Equal(t, bn, rn)
 				}
 				// verify againt the map
@@ -2224,11 +1827,10 @@ func TestRle16RandomIaddRangeIremoveRange031(t *testing.T) {
 
 func TestAllContainerMethodsAllContainerTypes065(t *testing.T) {
 	t.Run("each of the container methods that takes two containers should handle all 3x3==9 possible ways of being called -- without panic", func(t *testing.T) {
-		a := newArrayContainer()
 		r := newRunContainer16()
 		b := newBitmapContainer()
 
-		arr := []container{a, r, b}
+		arr := []container{r, b}
 		for _, i := range arr {
 			for _, j := range arr {
 				i.and(j)
@@ -2258,136 +1860,6 @@ type twofer struct {
 	cn   container
 }
 
-func TestAllContainerMethodsAllContainerTypesWithData067(t *testing.T) {
-	t.Run("each of the container methods that takes two containers should handle all 3x3==9 possible ways of being called -- and return results that agree with each other", func(t *testing.T) {
-		//rleVerbose = true
-
-		seed := int64(42)
-		rand.Seed(seed)
-
-		srang := newInterval16Range(MaxUint16-100, MaxUint16)
-		trials := []trial{
-			{n: 100, percentFill: .7, ntrial: 1, numRandomOpsPass: 100},
-			{n: 100, percentFill: .7, ntrial: 1, numRandomOpsPass: 100, srang: &srang}}
-
-		tester := func(tr trial) {
-			for j := 0; j < tr.ntrial; j++ {
-
-				a, r, b := getRandomSameThreeContainers(tr)
-				a2, r2, b2 := getRandomSameThreeContainers(tr)
-
-				receiver := []container{a, r, b}
-				arg := []container{a2, r2, b2}
-				callme := []twofer{}
-
-				nCalls := 0
-				for k, c := range receiver {
-					callme = append(callme, twofer{"and", c.and, c})
-					callme = append(callme, twofer{"iand", c.iand, c})
-					callme = append(callme, twofer{"ior", c.ior, c})
-					callme = append(callme, twofer{"lazyOR", c.lazyOR, c})
-					callme = append(callme, twofer{"lazyIOR", c.lazyIOR, c})
-					callme = append(callme, twofer{"or", c.or, c})
-					callme = append(callme, twofer{"xor", c.xor, c})
-					callme = append(callme, twofer{"andNot", c.andNot, c})
-					callme = append(callme, twofer{"iandNot", c.iandNot, c})
-					if k == 0 {
-						nCalls = len(callme)
-					}
-				}
-
-				for pass := 0; pass < tr.numRandomOpsPass+1; pass++ {
-					for k := 0; k < nCalls; k++ {
-						perm := getRandomPermutation(nCalls)
-						kk := perm[k]
-						c1 := callme[kk]          // array receiver
-						c2 := callme[kk+nCalls]   // run receiver
-						c3 := callme[kk+2*nCalls] // bitmap receiver
-
-						if c1.name != c2.name {
-							panic("internal logic error")
-						}
-						if c3.name != c2.name {
-							panic("internal logic error")
-						}
-
-						for k2, a := range arg {
-
-							if !c1.cn.equals(c2.cn) {
-								panic("c1 not equal to c2")
-							}
-							if !c1.cn.equals(c3.cn) {
-								panic("c1 not equal to c3")
-							}
-
-							res1 := c1.call(a) // array
-							res2 := c2.call(a) // run
-							res3 := c3.call(a) // bitmap
-
-							z := c1.name
-
-							// In-place operation are best effort
-							// User should not assume the receiver is modified, returned container has to be used
-							if strings.HasPrefix(z, "i") {
-								c1.cn = res1
-								c2.cn = res2
-								c3.cn = res3
-							}
-
-							if strings.HasPrefix(z, "lazy") {
-								// on purpose, the lazy functions
-								// do not scan to update their cardinality
-								if asBc, isBc := res1.(*bitmapContainer); isBc {
-									asBc.computeCardinality()
-								}
-								if asBc, isBc := res2.(*bitmapContainer); isBc {
-									asBc.computeCardinality()
-								}
-								if asBc, isBc := res3.(*bitmapContainer); isBc {
-									asBc.computeCardinality()
-								}
-							}
-
-							// check for equality all ways...
-							// excercising equals() calls too.
-
-							if !res1.equals(res2) {
-								panic(fmt.Sprintf("k:%v, k2:%v, res1 != res2,"+
-									" call is '%s'", k, k2, c1.name))
-							}
-							if !res2.equals(res1) {
-								panic(fmt.Sprintf("k:%v, k2:%v, res2 != res1,"+
-									" call is '%s'", k, k2, c1.name))
-							}
-							if !res1.equals(res3) {
-								panic(fmt.Sprintf("k:%v, k2:%v, res1 != res3,"+
-									" call is '%s'", k, k2, c1.name))
-							}
-							if !res3.equals(res1) {
-								panic(fmt.Sprintf("k:%v, k2:%v, res3 != res1,"+
-									" call is '%s'", k, k2, c1.name))
-							}
-							if !res2.equals(res3) {
-								panic(fmt.Sprintf("k:%v, k2:%v, res2 != res3,"+
-									" call is '%s'", k, k2, c1.name))
-							}
-							if !res3.equals(res2) {
-								panic(fmt.Sprintf("k:%v, k2:%v, res3 != res2,"+
-									" call is '%s'", k, k2, c1.name))
-							}
-						}
-					} // end k
-				} // end pass
-
-			} // end j
-		} // end tester
-
-		for i := range trials {
-			tester(trials[i])
-		}
-	})
-}
-
 func TestRuntimeIteratorPeekNext(t *testing.T) {
 	testContainerIteratorPeekNext(t, newRunContainer16())
 }
@@ -2404,40 +1876,4 @@ func BenchmarkShortIteratorAdvanceRuntime(b *testing.B) {
 // go test -bench BenchmarkShortIteratorNext -run -
 func BenchmarkShortIteratorNextRuntime(b *testing.B) {
 	benchmarkContainerIteratorNext(b, newRunContainer16())
-}
-
-// generate random contents, then return that same
-// logical content in three different container types
-func getRandomSameThreeContainers(tr trial) (*arrayContainer, *runContainer16, *bitmapContainer) {
-
-	ma := make(map[int]bool)
-
-	n := tr.n
-	a := []uint16{}
-
-	var samp interval16
-	if tr.srang != nil {
-		samp = *tr.srang
-	} else {
-		if n-1 > MaxUint16 {
-			panic(fmt.Errorf("n out of range: %v", n))
-		}
-		samp.start = 0
-		samp.length = uint16(n - 2)
-	}
-
-	draw := int(float64(n) * tr.percentFill)
-	for i := 0; i < draw; i++ {
-		r0 := int(samp.start) + rand.Intn(int(samp.runlen()))
-		a = append(a, uint16(r0))
-		ma[r0] = true
-	}
-
-	rc := newRunContainer16FromVals(false, a...)
-
-	// vs bitmapContainer
-	bc := newBitmapContainerFromRun(rc)
-	ac := rc.toArrayContainer()
-
-	return ac, rc, bc
 }

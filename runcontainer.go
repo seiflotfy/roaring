@@ -255,40 +255,6 @@ func newRunContainer16FromBitmapContainer(bc *bitmapContainer) *runContainer16 {
 		curWord = curWordWith1s & (curWordWith1s + 1)
 		// We've lathered and rinsed, so repeat...
 	}
-
-}
-
-//
-// newRunContainer16FromArray populates a new
-// runContainer16 from the contents of arr.
-//
-func newRunContainer16FromArray(arr *arrayContainer) *runContainer16 {
-	// keep this in sync with newRunContainer16FromVals above
-
-	rc := &runContainer16{}
-	ah := addHelper16{rc: rc}
-
-	n := arr.getCardinality()
-	var cur, prev uint16
-	switch {
-	case n == 0:
-		// nothing more
-	case n == 1:
-		ah.m = append(ah.m, newInterval16Range(arr.content[0], arr.content[0]))
-		ah.actuallyAdded++
-	default:
-		ah.runstart = arr.content[0]
-		ah.actuallyAdded++
-		for i := 1; i < n; i++ {
-			prev = arr.content[i-1]
-			cur = arr.content[i]
-			ah.add(cur, prev, i)
-		}
-		ah.storeIval(ah.runstart, ah.runlen)
-	}
-	rc.iv = ah.m
-	rc.card = int64(ah.actuallyAdded)
-	return rc
 }
 
 // set adds the integers in vals to the set. Vals
@@ -1855,8 +1821,6 @@ func (rc *runContainer16) and(a container) container {
 	switch c := a.(type) {
 	case *runContainer16:
 		return rc.intersect(c)
-	case *arrayContainer:
-		return rc.andArray(c)
 	case *bitmapContainer:
 		return rc.andBitmapContainer(c)
 	}
@@ -1867,8 +1831,6 @@ func (rc *runContainer16) andCardinality(a container) int {
 	switch c := a.(type) {
 	case *runContainer16:
 		return int(rc.intersectCardinality(c))
-	case *arrayContainer:
-		return rc.andArrayCardinality(c)
 	case *bitmapContainer:
 		return rc.andBitmapContainerCardinality(c)
 	}
@@ -1881,35 +1843,6 @@ func (rc *runContainer16) andBitmapContainer(bc *bitmapContainer) container {
 	return bc2.andBitmap(bc)
 }
 
-func (rc *runContainer16) andArrayCardinality(ac *arrayContainer) int {
-	pos := 0
-	answer := 0
-	maxpos := ac.getCardinality()
-	if maxpos == 0 {
-		return 0 // won't happen in actual code
-	}
-	v := ac.content[pos]
-mainloop:
-	for _, p := range rc.iv {
-		for v < p.start {
-			pos++
-			if pos == maxpos {
-				break mainloop
-			}
-			v = ac.content[pos]
-		}
-		for v <= p.last() {
-			answer++
-			pos++
-			if pos == maxpos {
-				break mainloop
-			}
-			v = ac.content[pos]
-		}
-	}
-	return answer
-}
-
 func (rc *runContainer16) iand(a container) container {
 	if rc.isFull() {
 		return a.clone()
@@ -1917,8 +1850,6 @@ func (rc *runContainer16) iand(a container) container {
 	switch c := a.(type) {
 	case *runContainer16:
 		return rc.inplaceIntersect(c)
-	case *arrayContainer:
-		return rc.andArray(c)
 	case *bitmapContainer:
 		return rc.iandBitmapContainer(c)
 	}
@@ -1939,40 +1870,8 @@ func (rc *runContainer16) iandBitmapContainer(bc *bitmapContainer) container {
 	return rc
 }
 
-func (rc *runContainer16) andArray(ac *arrayContainer) container {
-	if len(rc.iv) == 0 {
-		return newArrayContainer()
-	}
-
-	acCardinality := ac.getCardinality()
-	c := newArrayContainerCapacity(acCardinality)
-
-	for rlePos, arrayPos := 0, 0; arrayPos < acCardinality; {
-		iv := rc.iv[rlePos]
-		arrayVal := ac.content[arrayPos]
-
-		for iv.last() < arrayVal {
-			rlePos++
-			if rlePos == len(rc.iv) {
-				return c
-			}
-			iv = rc.iv[rlePos]
-		}
-
-		if iv.start > arrayVal {
-			arrayPos = advanceUntil(ac.content, arrayPos, len(ac.content), iv.start)
-		} else {
-			c.content = append(c.content, arrayVal)
-			arrayPos++
-		}
-	}
-	return c
-}
-
 func (rc *runContainer16) andNot(a container) container {
 	switch c := a.(type) {
-	case *arrayContainer:
-		return rc.andNotArray(c)
 	case *bitmapContainer:
 		return rc.andNotBitmap(c)
 	case *runContainer16:
@@ -2156,8 +2055,6 @@ func (rc *runContainer16) or(a container) container {
 	switch c := a.(type) {
 	case *runContainer16:
 		return rc.union(c)
-	case *arrayContainer:
-		return rc.orArray(c)
 	case *bitmapContainer:
 		return rc.orBitmapContainer(c)
 	}
@@ -2168,8 +2065,6 @@ func (rc *runContainer16) orCardinality(a container) int {
 	switch c := a.(type) {
 	case *runContainer16:
 		return int(rc.unionCardinality(c))
-	case *arrayContainer:
-		return rc.orArrayCardinality(c)
 	case *bitmapContainer:
 		return rc.orBitmapContainerCardinality(c)
 	}
@@ -2195,18 +2090,6 @@ func (rc *runContainer16) orBitmapContainerCardinality(bc *bitmapContainer) int 
 	return rc.getCardinality() + bc.getCardinality() - rc.andBitmapContainerCardinality(bc)
 }
 
-// orArray finds the union of rc and ac.
-func (rc *runContainer16) orArray(ac *arrayContainer) container {
-	bc1 := newBitmapContainerFromRun(rc)
-	bc2 := ac.toBitmapContainer()
-	return bc1.orBitmap(bc2)
-}
-
-// orArray finds the union of rc and ac.
-func (rc *runContainer16) orArrayCardinality(ac *arrayContainer) int {
-	return ac.getCardinality() + rc.getCardinality() - rc.andArrayCardinality(ac)
-}
-
 func (rc *runContainer16) ior(a container) container {
 	if rc.isFull() {
 		return rc
@@ -2214,8 +2097,6 @@ func (rc *runContainer16) ior(a container) container {
 	switch c := a.(type) {
 	case *runContainer16:
 		return rc.inplaceUnion(c)
-	case *arrayContainer:
-		return rc.iorArray(c)
 	case *bitmapContainer:
 		return rc.iorBitmapContainer(c)
 	}
@@ -2235,14 +2116,6 @@ func (rc *runContainer16) inplaceUnion(rc2 *runContainer16) container {
 func (rc *runContainer16) iorBitmapContainer(bc *bitmapContainer) container {
 
 	it := bc.getShortIterator()
-	for it.hasNext() {
-		rc.Add(it.next())
-	}
-	return rc
-}
-
-func (rc *runContainer16) iorArray(ac *arrayContainer) container {
-	it := ac.getShortIterator()
 	for it.hasNext() {
 		rc.Add(it.next())
 	}
@@ -2311,8 +2184,6 @@ func (rc *runContainer16) intersects(a container) bool {
 
 func (rc *runContainer16) xor(a container) container {
 	switch c := a.(type) {
-	case *arrayContainer:
-		return rc.xorArray(c)
 	case *bitmapContainer:
 		return rc.xorBitmap(c)
 	case *runContainer16:
@@ -2323,8 +2194,6 @@ func (rc *runContainer16) xor(a container) container {
 
 func (rc *runContainer16) iandNot(a container) container {
 	switch c := a.(type) {
-	case *arrayContainer:
-		return rc.iandNotArray(c)
 	case *bitmapContainer:
 		return rc.iandNotBitmap(c)
 	case *runContainer16:
@@ -2379,12 +2248,6 @@ func (rc *runContainer16) andNotRunContainer16(b *runContainer16) container {
 	return rc.AndNotRunContainer16(b)
 }
 
-func (rc *runContainer16) andNotArray(ac *arrayContainer) container {
-	rcb := rc.toBitmapContainer()
-	acb := ac.toBitmapContainer()
-	return rcb.andNotBitmap(acb)
-}
-
 func (rc *runContainer16) andNotBitmap(bc *bitmapContainer) container {
 	rcb := rc.toBitmapContainer()
 	return rcb.andNotBitmap(bc)
@@ -2410,17 +2273,6 @@ func (rc *runContainer16) iandNotRunContainer16(x2 *runContainer16) container {
 	return rc
 }
 
-func (rc *runContainer16) iandNotArray(ac *arrayContainer) container {
-	rcb := rc.toBitmapContainer()
-	acb := ac.toBitmapContainer()
-	rcb.iandNotBitmapSurely(acb)
-	// TODO: check size and optimize the return value
-	// TODO: is inplace modification really required? If not, elide the copy.
-	rc2 := newRunContainer16FromBitmapContainer(rcb)
-	*rc = *rc2
-	return rc
-}
-
 func (rc *runContainer16) iandNotBitmap(bc *bitmapContainer) container {
 	rcb := rc.toBitmapContainer()
 	rcb.iandNotBitmapSurely(bc)
@@ -2435,12 +2287,6 @@ func (rc *runContainer16) xorRunContainer16(x2 *runContainer16) container {
 	rcb := rc.toBitmapContainer()
 	x2b := x2.toBitmapContainer()
 	return rcb.xorBitmap(x2b)
-}
-
-func (rc *runContainer16) xorArray(ac *arrayContainer) container {
-	rcb := rc.toBitmapContainer()
-	acb := ac.toBitmapContainer()
-	return rcb.xorBitmap(acb)
 }
 
 func (rc *runContainer16) xorBitmap(bc *bitmapContainer) container {
@@ -2459,19 +2305,8 @@ func (rc *runContainer16) toEfficientContainer() container {
 	if sizeAsRunContainer <= minOfInt(sizeAsBitmapContainer, sizeAsArrayContainer) {
 		return rc
 	}
-	if card <= arrayDefaultMaxSize {
-		return rc.toArrayContainer()
-	}
 	bc := newBitmapContainerFromRun(rc)
 	return bc
-}
-
-func (rc *runContainer16) toArrayContainer() *arrayContainer {
-	ac := newArrayContainer()
-	for i := range rc.iv {
-		ac.iaddRange(int(rc.iv[i].start), int(rc.iv[i].last())+1)
-	}
-	return ac
 }
 
 func newRunContainer16FromContainer(c container) *runContainer16 {
@@ -2479,8 +2314,6 @@ func newRunContainer16FromContainer(c container) *runContainer16 {
 	switch x := c.(type) {
 	case *runContainer16:
 		return x.Clone()
-	case *arrayContainer:
-		return newRunContainer16FromArray(x)
 	case *bitmapContainer:
 		return newRunContainer16FromBitmapContainer(x)
 	}

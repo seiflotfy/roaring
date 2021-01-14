@@ -417,10 +417,6 @@ func (rb *Bitmap) Iterate(cb func(x uint32) bool) {
 		var shouldContinue bool
 		// This is hacky but it avoids allocations from invoking an interface method with a closure
 		switch t := c.(type) {
-		case *arrayContainer:
-			shouldContinue = t.iterate(func(x uint16) bool {
-				return cb(uint32(x) | hs)
-			})
 		case *runContainer16:
 			shouldContinue = t.iterate(func(x uint16) bool {
 				return cb(uint32(x) | hs)
@@ -570,14 +566,9 @@ func (rb *Bitmap) Add(x uint32) {
 	hb := highbits(x)
 	ra := &rb.highlowcontainer
 	i := ra.getIndex(hb)
-	if i >= 0 {
-		var c container
-		c = ra.getWritableContainerAtIndex(i).iaddReturnMinimized(lowbits(x))
-		rb.highlowcontainer.setContainerAtIndex(i, c)
-	} else {
-		newac := newArrayContainer()
-		rb.highlowcontainer.insertNewKeyValueAt(-i-1, hb, newac.iaddReturnMinimized(lowbits(x)))
-	}
+	var c container
+	c = ra.getWritableContainerAtIndex(i).iaddReturnMinimized(lowbits(x))
+	rb.highlowcontainer.setContainerAtIndex(i, c)
 }
 
 // add the integer x to the bitmap, return the container and its index
@@ -586,15 +577,9 @@ func (rb *Bitmap) addwithptr(x uint32) (int, container) {
 	ra := &rb.highlowcontainer
 	i := ra.getIndex(hb)
 	var c container
-	if i >= 0 {
-		c = ra.getWritableContainerAtIndex(i).iaddReturnMinimized(lowbits(x))
-		rb.highlowcontainer.setContainerAtIndex(i, c)
-		return i, c
-	}
-	newac := newArrayContainer()
-	c = newac.iaddReturnMinimized(lowbits(x))
-	rb.highlowcontainer.insertNewKeyValueAt(-i-1, hb, c)
-	return -i - 1, c
+	c = ra.getWritableContainerAtIndex(i).iaddReturnMinimized(lowbits(x))
+	rb.highlowcontainer.setContainerAtIndex(i, c)
+	return i, c
 }
 
 // CheckedAdd adds the integer x to the bitmap and return true  if it was added (false if the integer was already present)
@@ -602,17 +587,11 @@ func (rb *Bitmap) CheckedAdd(x uint32) bool {
 	// TODO: add unit tests for this method
 	hb := highbits(x)
 	i := rb.highlowcontainer.getIndex(hb)
-	if i >= 0 {
-		C := rb.highlowcontainer.getWritableContainerAtIndex(i)
-		oldcard := C.getCardinality()
-		C = C.iaddReturnMinimized(lowbits(x))
-		rb.highlowcontainer.setContainerAtIndex(i, C)
-		return C.getCardinality() > oldcard
-	}
-	newac := newArrayContainer()
-	rb.highlowcontainer.insertNewKeyValueAt(-i-1, hb, newac.iaddReturnMinimized(lowbits(x)))
-	return true
-
+	C := rb.highlowcontainer.getWritableContainerAtIndex(i)
+	oldcard := C.getCardinality()
+	C = C.iaddReturnMinimized(lowbits(x))
+	rb.highlowcontainer.setContainerAtIndex(i, C)
+	return C.getCardinality() > oldcard
 }
 
 // AddInt adds the integer x to the bitmap (convenience method: the parameter is casted to uint32 and we call Add)
@@ -1533,10 +1512,6 @@ func (rb *Bitmap) Stats() Statistics {
 		stats.Cardinality += uint64(c.getCardinality())
 
 		switch c.(type) {
-		case *arrayContainer:
-			stats.ArrayContainers++
-			stats.ArrayContainerBytes += uint64(c.getSizeInBytes())
-			stats.ArrayContainerValues += uint64(c.getCardinality())
 		case *bitmapContainer:
 			stats.BitmapContainers++
 			stats.BitmapContainerBytes += uint64(c.getSizeInBytes())

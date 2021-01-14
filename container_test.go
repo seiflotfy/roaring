@@ -2,18 +2,11 @@ package roaring
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"log"
 	"testing"
-)
 
-func makeContainer(ss []uint16) container {
-	c := newArrayContainer()
-	for _, s := range ss {
-		c.iadd(s)
-	}
-	return c
-}
+	"github.com/stretchr/testify/assert"
+)
 
 func checkContent(c container, s []uint16) bool {
 	si := c.getShortIterator()
@@ -198,20 +191,6 @@ func benchmarkContainerIteratorNext(b *testing.B, con container) {
 	}
 }
 
-func TestContainerReverseIterator(t *testing.T) {
-	content := []uint16{1, 3, 5, 7, 9}
-	c := makeContainer(content)
-	si := c.getReverseIterator()
-	i := 4
-
-	for si.hasNext() {
-		assert.Equal(t, content[i], si.next())
-		i--
-	}
-
-	assert.Equal(t, -1, i)
-}
-
 func TestRoaringContainer(t *testing.T) {
 	t.Run("countTrailingZeros", func(t *testing.T) {
 		x := uint64(0)
@@ -223,19 +202,6 @@ func TestRoaringContainer(t *testing.T) {
 		assert.Equal(t, 3, o)
 	})
 
-	t.Run("ArrayShortIterator", func(t *testing.T) {
-		content := []uint16{1, 3, 5, 7, 9}
-		c := makeContainer(content)
-		si := c.getShortIterator()
-		i := 0
-		for si.hasNext() {
-			si.next()
-			i++
-		}
-
-		assert.Equal(t, 5, i)
-	})
-
 	t.Run("BinarySearch", func(t *testing.T) {
 		content := []uint16{1, 3, 5, 7, 9}
 		res := binarySearch(content, 5)
@@ -243,53 +209,5 @@ func TestRoaringContainer(t *testing.T) {
 
 		res = binarySearch(content, 4)
 		assert.Less(t, res, 0)
-	})
-
-	t.Run("bitmapcontainer", func(t *testing.T) {
-		content := []uint16{1, 3, 5, 7, 9}
-		a := newArrayContainer()
-		b := newBitmapContainer()
-		for _, v := range content {
-			a.iadd(v)
-			b.iadd(v)
-		}
-		c := a.toBitmapContainer()
-
-		assert.Equal(t, b.getCardinality(), a.getCardinality())
-		assert.Equal(t, b.getCardinality(), c.getCardinality())
-	})
-
-	t.Run("inottest0", func(t *testing.T) {
-		content := []uint16{9}
-		c := makeContainer(content)
-		c = c.inot(0, 11)
-		si := c.getShortIterator()
-		i := 0
-		for si.hasNext() {
-			si.next()
-			i++
-		}
-
-		assert.Equal(t, 10, i)
-	})
-
-	t.Run("inotTest1", func(t *testing.T) {
-		// Array container, range is complete
-		content := []uint16{1, 3, 5, 7, 9}
-		//content := []uint16{1}
-		edge := 1 << 13
-		c := makeContainer(content)
-		c = c.inot(0, edge+1)
-		size := edge - len(content)
-		s := make([]uint16, size+1)
-		pos := 0
-		for i := uint16(0); i < uint16(edge+1); i++ {
-			if binarySearch(content, i) < 0 {
-				s[pos] = i
-				pos++
-			}
-		}
-
-		assert.True(t, checkContent(c, s))
 	})
 }

@@ -10,11 +10,6 @@ import (
 	"unsafe"
 )
 
-func (ac *arrayContainer) writeTo(stream io.Writer) (int, error) {
-	buf := uint16SliceAsByteSlice(ac.content)
-	return stream.Write(buf)
-}
-
 func (bc *bitmapContainer) writeTo(stream io.Writer) (int, error) {
 	if bc.cardinality <= arrayDefaultMaxSize {
 		return 0, errors.New("refusing to write bitmap container with cardinality of array container")
