@@ -313,13 +313,14 @@ func (bc *bitmapContainer) iaddReturnMinimized(i uint16) container {
 }
 
 func (bc *bitmapContainer) iadd(i uint16) bool {
-	x := int(i)
-	previous := bc.bitmap[x>>6]
-	mask := uint64(1) << (uint(x) & 63)
-	newb := previous | mask
-	bc.bitmap[x>>6] = newb
-	bc.cardinality += int((previous ^ newb) >> (uint(x) & 63))
-	return newb != previous
+	previous := bc.bitmap[i>>6]
+	newb := previous | 1<<(i&63)
+	if newb != previous {
+		bc.bitmap[i>>6] = newb
+		bc.cardinality++
+		return true
+	}
+	return false
 }
 
 func (bc *bitmapContainer) iremoveReturnMinimized(i uint16) container {
