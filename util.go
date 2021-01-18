@@ -47,18 +47,18 @@ func getSizeInBytesFromCardinality(card int) int {
 	return 2 * card
 }
 
-func fill(arr []uint64, val uint64) {
+func fill(arr _bitmap, val uint64) {
 	for i := range arr {
 		arr[i] = val
 	}
 }
-func fillRange(arr []uint64, start, end int, val uint64) {
+func fillRange(arr _bitmap, start, end int, val uint64) {
 	for i := start; i < end; i++ {
 		arr[i] = val
 	}
 }
 
-func fillArrayAND(container []uint16, bitmap1, bitmap2 []uint64) {
+func fillArrayAND(container []uint16, bitmap1, bitmap2 _bitmap) {
 	if len(bitmap1) != len(bitmap2) {
 		panic("array lengths don't match")
 	}
@@ -75,7 +75,7 @@ func fillArrayAND(container []uint16, bitmap1, bitmap2 []uint64) {
 	}
 }
 
-func fillArrayANDNOT(container []uint16, bitmap1, bitmap2 []uint64) {
+func fillArrayANDNOT(container []uint16, bitmap1, bitmap2 _bitmap) {
 	if len(bitmap1) != len(bitmap2) {
 		panic("array lengths don't match")
 	}
@@ -92,7 +92,7 @@ func fillArrayANDNOT(container []uint16, bitmap1, bitmap2 []uint64) {
 	}
 }
 
-func fillArrayXOR(container []uint16, bitmap1, bitmap2 []uint64) {
+func fillArrayXOR(container []uint16, bitmap1, bitmap2 _bitmap) {
 	if len(bitmap1) != len(bitmap2) {
 		panic("array lengths don't match")
 	}
@@ -118,7 +118,7 @@ func lowbits(x uint32) uint16 {
 
 const maxLowBit = 0xFFFF
 
-func flipBitmapRange(bitmap []uint64, start int, end int) {
+func flipBitmapRange(bitmap _bitmap, start int, end int) {
 	if start >= end {
 		return
 	}
@@ -131,7 +131,7 @@ func flipBitmapRange(bitmap []uint64, start int, end int) {
 	bitmap[endword] ^= ^uint64(0) >> (uint(-end) % 64)
 }
 
-func resetBitmapRange(bitmap []uint64, start int, end int) {
+func resetBitmapRange(bitmap _bitmap, start int, end int) {
 	if start >= end {
 		return
 	}
@@ -149,7 +149,7 @@ func resetBitmapRange(bitmap []uint64, start int, end int) {
 
 }
 
-func setBitmapRange(bitmap []uint64, start int, end int) {
+func setBitmapRange(bitmap _bitmap, start int, end int) {
 	if start >= end {
 		return
 	}
@@ -166,28 +166,28 @@ func setBitmapRange(bitmap []uint64, start int, end int) {
 	bitmap[endword] |= ^uint64(0) >> (uint(-end) % 64)
 }
 
-func flipBitmapRangeAndCardinalityChange(bitmap []uint64, start int, end int) int {
+func flipBitmapRangeAndCardinalityChange(bitmap _bitmap, start int, end int) int {
 	before := wordCardinalityForBitmapRange(bitmap, start, end)
 	flipBitmapRange(bitmap, start, end)
 	after := wordCardinalityForBitmapRange(bitmap, start, end)
 	return int(after - before)
 }
 
-func resetBitmapRangeAndCardinalityChange(bitmap []uint64, start int, end int) int {
+func resetBitmapRangeAndCardinalityChange(bitmap _bitmap, start int, end int) int {
 	before := wordCardinalityForBitmapRange(bitmap, start, end)
 	resetBitmapRange(bitmap, start, end)
 	after := wordCardinalityForBitmapRange(bitmap, start, end)
 	return int(after - before)
 }
 
-func setBitmapRangeAndCardinalityChange(bitmap []uint64, start int, end int) int {
+func setBitmapRangeAndCardinalityChange(bitmap _bitmap, start int, end int) int {
 	before := wordCardinalityForBitmapRange(bitmap, start, end)
 	setBitmapRange(bitmap, start, end)
 	after := wordCardinalityForBitmapRange(bitmap, start, end)
 	return int(after - before)
 }
 
-func wordCardinalityForBitmapRange(bitmap []uint64, start int, end int) uint64 {
+func wordCardinalityForBitmapRange(bitmap _bitmap, start int, end int) uint64 {
 	answer := uint64(0)
 	if start >= end {
 		return answer

@@ -23,7 +23,7 @@ func (bc *bitmapContainer) writeTo(stream io.Writer) (int, error) {
 	return stream.Write(buf)
 }
 
-func uint64SliceAsByteSlice(slice []uint64) []byte {
+func uint64SliceAsByteSlice(slice _bitmap) []byte {
 	// make a new slice header
 	header := *(*reflect.SliceHeader)(unsafe.Pointer(&slice))
 
@@ -89,7 +89,7 @@ func byteSliceAsUint16Slice(slice []byte) (result []uint16) { // here we create 
 	return
 }
 
-func byteSliceAsUint64Slice(slice []byte) (result []uint64) {
+func byteSliceAsUint64Slice(slice []byte) (result _bitmap) {
 	if len(slice)%8 != 0 {
 		panic("Slice size should be divisible by 8")
 	}

@@ -5,9 +5,11 @@ import (
 	"unsafe"
 )
 
+type _bitmap [1024]uint64
+
 type bitmapContainer struct {
 	cardinality int
-	bitmap      []uint64
+	bitmap      _bitmap
 }
 
 func (bc bitmapContainer) String() string {
@@ -20,8 +22,6 @@ func (bc bitmapContainer) String() string {
 
 func newBitmapContainer() *bitmapContainer {
 	p := new(bitmapContainer)
-	size := (1 << 16) >> 6 // 1024
-	p.bitmap = make([]uint64, size, size)
 	return p
 }
 
@@ -252,7 +252,7 @@ func bitmapContainerSizeInBytes() int {
 	return bcBaseBytes + (1<<16)/8
 }
 
-func bitmapEquals(a, b []uint64) bool {
+func bitmapEquals(a, b _bitmap) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -350,8 +350,7 @@ func (bc *bitmapContainer) getCardinality() int {
 }
 
 func (bc *bitmapContainer) clone() container {
-	ptr := bitmapContainer{bc.cardinality, make([]uint64, len(bc.bitmap))}
-	copy(ptr.bitmap, bc.bitmap[:])
+	ptr := bitmapContainer{cardinality: bc.cardinality, bitmap: bc.bitmap}
 	return &ptr
 }
 
@@ -537,15 +536,15 @@ func (bc *bitmapContainer) orBitmap(value2 *bitmapContainer) container {
 }
 
 func (bc *bitmapContainer) orBitmapCardinality(value2 *bitmapContainer) int {
-	return int(popcntOrSlice(bc.bitmap, value2.bitmap))
+	return int(popcntOrSlice(bc.bitmap[:], value2.bitmap[:]))
 }
 
 func (bc *bitmapContainer) andBitmapCardinality(value2 *bitmapContainer) int {
-	return int(popcntAndSlice(bc.bitmap, value2.bitmap))
+	return int(popcntAndSlice(bc.bitmap[:], value2.bitmap[:]))
 }
 
 func (bc *bitmapContainer) computeCardinality() {
-	bc.cardinality = int(popcntSlice(bc.bitmap))
+	bc.cardinality = int(popcntSlice(bc.bitmap[:]))
 }
 
 func (bc *bitmapContainer) iorArray(ac *arrayContainer) container {
@@ -678,7 +677,7 @@ func (bc *bitmapContainer) selectInt(x uint16) int {
 }
 
 func (bc *bitmapContainer) xorBitmap(value2 *bitmapContainer) container {
-	newCardinality := int(popcntXorSlice(bc.bitmap, value2.bitmap))
+	newCardinality := int(popcntXorSlice(bc.bitmap[:], value2.bitmap[:]))
 
 	if newCardinality > arrayDefaultMaxSize {
 		answer := newBitmapContainer()
@@ -803,7 +802,7 @@ func (bc *bitmapContainer) getCardinalityInRange(start, end uint) int {
 }
 
 func (bc *bitmapContainer) andBitmap(value2 *bitmapContainer) container {
-	newcardinality := int(popcntAndSlice(bc.bitmap, value2.bitmap))
+	newcardinality := int(popcntAndSlice(bc.bitmap[:], value2.bitmap[:]))
 	if newcardinality > arrayDefaultMaxSize {
 		answer := newBitmapContainer()
 		for k := 0; k < len(answer.bitmap); k++ {
@@ -841,7 +840,7 @@ func (bc *bitmapContainer) intersectsBitmap(value2 *bitmapContainer) bool {
 }
 
 func (bc *bitmapContainer) iandBitmap(value2 *bitmapContainer) container {
-	newcardinality := int(popcntAndSlice(bc.bitmap, value2.bitmap))
+	newcardinality := int(popcntAndSlice(bc.bitmap[:], value2.bitmap[:]))
 	for k := 0; k < len(bc.bitmap); k++ {
 		bc.bitmap[k] = bc.bitmap[k] & value2.bitmap[k]
 	}
@@ -910,7 +909,7 @@ func (bc *bitmapContainer) andNotArray(value2 *arrayContainer) container {
 }
 
 func (bc *bitmapContainer) andNotBitmap(value2 *bitmapContainer) container {
-	newCardinality := int(popcntMaskSlice(bc.bitmap, value2.bitmap))
+	newCardinality := int(popcntMaskSlice(bc.bitmap[:], value2.bitmap[:]))
 	if newCardinality > arrayDefaultMaxSize {
 		answer := newBitmapContainer()
 		for k := 0; k < len(answer.bitmap); k++ {
@@ -925,7 +924,7 @@ func (bc *bitmapContainer) andNotBitmap(value2 *bitmapContainer) container {
 }
 
 func (bc *bitmapContainer) iandNotBitmapSurely(value2 *bitmapContainer) container {
-	newCardinality := int(popcntMaskSlice(bc.bitmap, value2.bitmap))
+	newCardinality := int(popcntMaskSlice(bc.bitmap[:], value2.bitmap[:]))
 	for k := 0; k < len(bc.bitmap); k++ {
 		bc.bitmap[k] = bc.bitmap[k] &^ value2.bitmap[k]
 	}
@@ -967,7 +966,7 @@ func (bc *bitmapContainer) resetTo(a container) {
 
 	case *bitmapContainer:
 		bc.cardinality = x.cardinality
-		copy(bc.bitmap, x.bitmap)
+		bc.bitmap = x.bitmap
 
 	case *runContainer16:
 		bc.cardinality = len(x.iv)

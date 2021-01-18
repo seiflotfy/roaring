@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+
 	"github.com/RoaringBitmap/roaring/internal"
 )
 

@@ -464,7 +464,7 @@ func (ac *arrayContainer) orArray(value2 *arrayContainer) container {
 			mask := uint64(1) << (v % 64)
 			bc.bitmap[i] |= mask
 		}
-		bc.cardinality = int(popcntSlice(bc.bitmap))
+		bc.cardinality = int(popcntSlice(bc.bitmap[:]))
 		if bc.cardinality <= arrayDefaultMaxSize {
 			return bc.toArrayContainer()
 		}
