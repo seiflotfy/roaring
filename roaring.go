@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"github.com/RoaringBitmap/roaring/internal"
+	"github.com/bits-and-blooms/bitset"
 )
 
 // Bitmap represents a compressed bitmap where you can add integers.
@@ -1735,4 +1736,47 @@ func (rb *Bitmap) Stats() Statistics {
 		}
 	}
 	return stats
+}
+
+// converts a roaring bitmap to a bitset.BitSet
+func (rb *Bitmap) ToBitset() *bitset.BitSet {
+	bs := bitset.New(0)
+	for i, container := range rb.highlowcontainer.containers {
+		// we need to determine highVal here, unfortunately, without more details
+		// it's not possible to provide accurate calculation
+		highVal := uint(i * 65536)
+		switch c := container.(type) {
+		case *arrayContainer:
+			for _, x := range c.content {
+				bs.Set(highVal | uint(x))
+			}
+		case *bitmapContainer:
+			for i, v := range c.bitmap {
+				low := uint(i << 6) // 64 bits per uint64
+				for j := uint(0); j < 64; j++ {
+					if (v & (1 << j)) != 0 {
+						bs.Set(highVal | uint(low+j))
+					}
+				}
+			}
+		case *runContainer16:
+			for _, iv := range c.iv {
+				for val := iv.start; val <= iv.last(); val++ {
+					bs.Set(highVal | uint(val))
+				}
+			}
+		default:
+			fmt.Printf("Unexpected type %T\n", c)
+		}
+	}
+	return bs
+}
+
+func (rb *Bitmap) ToBitsetViaIterator() *bitset.BitSet {
+	bs := bitset.New(0)
+	it := rb.Iterator()
+	for it.HasNext() {
+		bs.Set(uint(it.Next()))
+	}
+	return bs
 }
